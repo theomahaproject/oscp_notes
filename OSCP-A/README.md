@@ -1,5 +1,17 @@
 # OSCP-A Walkthrough
 
+## ActiveDirectory
+* <a href="#intial">Initial Escalation</a>
+
+
+## Standalone Machines
+* <a href="#149">.149</a>
+* <a href="#150">.150</a>
+* <a href="#151">.151</a>
+
+
+<div id=initial></div>
+
 Okay we've been given creds to the .141 machine:
 
 <img src="images/creds.png" style="border: 2px solid white"><br>
