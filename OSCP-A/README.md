@@ -5,9 +5,9 @@
 
 
 ## Standalone Machines
-* <a href="#149">.149</a>
-* <a href="#150">.150</a>
-* <a href="#151">.151</a>
+* <a href="#143">.149</a>
+* <a href="#144">.150</a>
+* <a href="#145">.151</a>
 
 
 <div id=initial></div>
@@ -198,9 +198,21 @@ Look nice and closely
 
 <img src="images/defaultpassword.png" style="border: 2px solid white"><br>
 
-Boom!
+Boom! Now we can use celia's account to pivot!
 
-Now we can use celia's account to pivot!
+Before we do any pivoting, we're going to need a tunneling tool to do it. I'm told the kids these days use <a href="https://github.com/nicocha30/ligolo-ng">ligolo</a>, so that's what we'll use. Go ahead and follow a guide to set it up if you need, it's pretty cool.
+
+In the meantime, in a tmux window on my Kali machine with the ligolo proxy file:
+
+`./proxy -selfcert`
+
+And then once that's up and running from the Windows machine .141, we need to run the agent:
+
+
+
+
+
+
 
 ```evil-winrm -i 10.10.122.142 -u "celia.almeda" -H E728ECBADFB02F51CE8EED753F3FF3FD```
 
