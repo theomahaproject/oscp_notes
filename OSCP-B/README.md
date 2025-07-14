@@ -62,6 +62,43 @@ Password: `kiero`
 
 Once again, I'm grumpy. That's like the 20th time I've been <i>this</i> close and had to look up the final step only for it to be some bullshit.
 
+<b>Note:</b> IP change as I rage quit after the FTP thing
+
+We'll run a quick `ls` to see what's happening:
+
+<img src="images/149-kieroftp.png" style="border: 2px solid white"><br>
+
+Sweet, some keys. Let's grab them with
+
+```get id_rsa```
+
+```get id_rsa_2```
+
+Taking a look around the file system here, I noticed the `home` directory has another user:
+
+<img src="images/149-ftp-home.png" style="border: 2px solid white"><br>
+
+And that `john` has our local.txt. 
+
+<img src="images/149-ftp-john-home.png" style="border: 2px solid white"><br>
+
+Given that for OSCP you need an interactive shell for your hack to count, I assume these private keys we found on the FTP are for his account. Let's close out the FTP connection and then:
+
+```chmod 600 id_rsa```
+
+```chmod 600 id_rsa_2```
+
+```ssh -i /home/john/id_rsa john@192.168.184.149```
+
+<img src="images/149-johnssh.png" style="border: 2px solid white"><br>
+
+Nice one. We've popped the intial access. Now we need to figure out our privilege escalation. 
+
+I'm prone to running a cheeky linPEAS but I'm going to start with a process check
+
+
+
+
 
 
 
