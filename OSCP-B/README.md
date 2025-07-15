@@ -94,12 +94,35 @@ Given that for OSCP you need an interactive shell for your hack to count, I assu
 
 Nice one. We've popped the intial access. Now we need to figure out our privilege escalation. 
 
-I'm prone to running a cheeky linPEAS but I'm going to start with a process check
+In john's home folder there's also a binary called `RESET_PASSWD`
 
+<img src="images/149-johnhome.png" style="border: 2px solid white"><br>
 
+By running `strings`, we can observer that this is likely what we saw in the SNMP walk.
 
+<img src="images/149-binarystrings.png" style="border: 2px solid white"><br>
 
+Interestingly, this binary is executed as root and can be run by our user `john`. It calls the `chpasswd` binary. What we can do here is to include our home directory in the `PATH` and put some malicious code into a file called `chpasswd`. The RESET_PASSWD binary will then use our `chpasswd` before looking elsewhere for the real binary.
 
+```export PATH=/home/john:$PATH```
+
+<img src="images/149-echopath.png" style="border: 2px solid white"><br>
+
+The code we'll inject here is copying our SSH key over to the root users folder (I ended up running linPEAS and saw that PermitRootLogin is set to Yes):
+
+```echo "cp /home/john/.ssh/authorized_keys /root/.ssh/" >> chpasswd```
+
+```chmod +x chpasswd```
+
+```./RESET_PASSWD```
+
+<img src="images/149-resetpasswd.png" style="border: 2px solid white"><br>
+
+And then we can simply kill our shell and log back in as root:
+
+<img src="images/149-root.png" style="border: 2px solid white"><br>
+
+We're done! Nice work.
 
 
 <br><br>
